@@ -19,7 +19,7 @@ warehouse_url=os.getenv("WAREHOUSE_URL")
 
 app=FastAPI() 
 
-origins = [f'{os.getenv("FRONT_URL")}']  
+origins = [f'{os.getenv("FRONT_URL")}',"http://localhost:5173"] 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -31,6 +31,10 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"My": "Store"}
+
+@app.get("/health")
+def health_check():
+    return {"status":"ok"}
 
 @app.post("/orders")
 def create_order(productOrder: ProductOrder,background_tasks: BackgroundTasks):
@@ -44,11 +48,13 @@ def create_order(productOrder: ProductOrder,background_tasks: BackgroundTasks):
 
         order=Order(
             product_id=productOrder.product_id,
+            product_name=product['name'],
             price=product['price'],
             fee=round(product['price']*productOrder.quantity *0.1, 2),
             total=round(product['price']*productOrder.quantity*1.1, 2),
             quantity=productOrder.quantity,
             status="pending",
+            message="---",
             created_at= datetime.utcnow().isoformat()
         )
 
@@ -107,6 +113,18 @@ def get_order(pk: str):
     except Exception as e:
         logger.error(f"Failed to fetch order {pk}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.delete("/orders/delete")
+def delete_orders():
+    logger.info("Deleting all orders")
+    try:
+        for pk in Order.all_pks():
+            Order.delete(pk)
+        logger.info("All orders deleted")
+        return {"message": "All orders deleted"}
+    except Exception as e:
+        logger.error(f"Failed to delete orders: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/orders/{pk}")
 def delete_order(pk: str):
@@ -123,17 +141,7 @@ def delete_order(pk: str):
         raise HTTPException(status_code=500, detail=str(e))    
 
 
-@app.delete("/orders/delete")
-def delete_orders():
-    logger.info("Deleting all orders")
-    try:
-        for pk in Order.all_pks():
-            Order.delete(pk)
-        logger.info("All orders deleted")
-        return {"message": "All orders deleted"}
-    except Exception as e:
-        logger.error(f"Failed to delete orders: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 
